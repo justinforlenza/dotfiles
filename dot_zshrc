@@ -111,7 +111,7 @@ source $ZSH/oh-my-zsh.sh
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # begin forge completion
-. <(forge --completion)
+#. <(forge --completion)
 # end forge completion
 
 #function gam() { "/home/justin/bin/gam/gam" "$@" ; }
