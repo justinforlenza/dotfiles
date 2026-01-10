@@ -3,4 +3,6 @@
 {{- if ne .chezmoi.hostname "xanathar" }}
 .config/pipewire/*
 .local/bin/change-mixer-output
+.local/bin/change-wallpaper
+.wallpapers
 {{- end }}

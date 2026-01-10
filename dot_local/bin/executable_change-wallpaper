@@ -1,0 +1,93 @@
+#!/bin/bash
+
+WALLPAPER_DIR="$HOME/.wallpapers"
+TEMP_DIR="/tmp/split-wallpapers"
+
+rm -rf "$TEMP_DIR"
+mkdir -p "$TEMP_DIR"
+
+# Generate a random id for this wallpaper change
+SESSION_ID=$(date +%s%N | sha256sum | head -c 8)
+
+# Randomly select a wallpaper
+WALLPAPER=$(find "$WALLPAPER_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.bmp" \) | shuf -n 1)
+
+# Get monitor information
+MONITOR_INFO=$(kscreen-doctor -o | sed 's/\x1b\[[0-9;]*m//g')
+
+# Parse resolutions and positions
+readarray -t MONITORS < <(echo "$MONITOR_INFO" | grep -E "^Output:" | awk '{print $2}')
+readarray -t GEOMETRIES < <(echo "$MONITOR_INFO" | grep "Geometry:" | awk '{print $2, $3}')
+
+# Calculate total width and get individual monitor specs
+TOTAL_WIDTH=0
+declare -a WIDTHS
+declare -a HEIGHTS
+declare -a POSITIONS
+
+for i in {0..2}; do
+    GEOM="${GEOMETRIES[$i]}"
+    # Parse geometry format: X,Y WIDTHxHEIGHT
+    # Split by space to get position and size separately
+    POS_PART=$(echo "$GEOM" | awk '{print $1}')
+    SIZE_PART=$(echo "$GEOM" | awk '{print $2}')
+    
+    X_POS=$(echo "$POS_PART" | cut -d',' -f1)
+    WIDTH=$(echo "$SIZE_PART" | cut -d'x' -f1)
+    HEIGHT=$(echo "$SIZE_PART" | cut -d'x' -f2)
+    
+    WIDTHS[$i]=$WIDTH
+    HEIGHTS[$i]=$HEIGHT
+    POSITIONS[$i]=$X_POS
+    TOTAL_WIDTH=$((TOTAL_WIDTH + WIDTH))
+done
+
+# Sort monitors by X position (left to right)
+declare -a SORTED_INDICES
+SORTED_INDICES=($(for i in {0..2}; do echo "$i ${POSITIONS[$i]}"; done | sort -k2 -n | awk '{print $1}'))
+
+# Get the maximum height among monitors
+MAX_HEIGHT=${HEIGHTS[0]}
+for h in "${HEIGHTS[@]}"; do
+    if [ "$h" -gt "$MAX_HEIGHT" ]; then
+        MAX_HEIGHT=$h
+    fi
+done
+
+# resize and center original
+magick "$WALLPAPER" -resize "${TOTAL_WIDTH}x${MAX_HEIGHT}^" -gravity center -extent "${TOTAL_WIDTH}x${MAX_HEIGHT}" "$TEMP_DIR/${SESSION_ID}_full.png"
+
+# Split the image for each monitor (in left-to-right order)
+X_OFFSET=0
+for idx in "${SORTED_INDICES[@]}"; do
+    W=${WIDTHS[$idx]}
+    H=${HEIGHTS[$idx]}
+    
+    # Crop from the full canvas
+    magick "$TEMP_DIR/${SESSION_ID}_full.png" -crop "${W}x${H}+${X_OFFSET}+0" "$TEMP_DIR/${SESSION_ID}_${idx}.png"
+    
+    X_OFFSET=$((X_OFFSET + W))
+done
+
+# Apply wallpapers to each monitor using KDE's plasma scripting
+qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+var allDesktops = desktops();
+var sessionId = '$SESSION_ID';
+for (var i = 0; i < allDesktops.length; i++) {
+    var d = allDesktops[i];
+    d.wallpaperPlugin = 'org.kde.image';
+    d.currentConfigGroup = Array('Wallpaper', 'org.kde.image', 'General');
+    d.writeConfig('Image', 'file://$TEMP_DIR/' + sessionId + '_' + i + '.png');
+    d.writeConfig('SlidePaths', '');
+}
+" > /dev/null
+
+# Reload all desktops to apply changes
+qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+var allDesktops = desktops();
+for (var i = 0; i < allDesktops.length; i++) {
+    allDesktops[i].reloadConfig();
+}
+" > /dev/null
+
+echo "Wallpaper applied: $WALLPAPER"
