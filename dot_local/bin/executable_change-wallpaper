@@ -1,10 +1,10 @@
 #!/bin/bash
 
 WALLPAPER_DIR="$HOME/.wallpapers"
-TEMP_DIR="/tmp/split-wallpapers"
+TEMP_DIR="$HOME/.local/share/split-wallpapers"
 
-rm -rf "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
+rm -f "$TEMP_DIR"/*.png
 
 # Generate a random id for this wallpaper change
 SESSION_ID=$(date +%s%N | sha256sum | head -c 8)

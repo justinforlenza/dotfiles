@@ -5,4 +5,5 @@
 .local/bin/change-mixer-output
 .local/bin/change-wallpaper
 .wallpapers
+.config/systemd/change-wallpaper.*
 {{- end }}
