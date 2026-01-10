@@ -1,0 +1,5 @@
+
+# stuff only for home pc
+{{- if ne .chezmoi.hostname "xanathar" }}
+.config/pipewire/*
+{{- end }}
