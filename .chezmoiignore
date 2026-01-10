@@ -2,4 +2,5 @@
 # stuff only for home pc
 {{- if ne .chezmoi.hostname "xanathar" }}
 .config/pipewire/*
+.local/bin/change-mixer-output
 {{- end }}
