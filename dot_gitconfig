@@ -3,3 +3,7 @@
 	email = justin@justinforlenza.dev
 [init]
 	defaultBranch = main
+[credential]
+	helper = "!f() { /home/justin/.vscode-server/bin/61b3d0ab13be7dda2389f1d3e60a119c7f660cc3/node /tmp/vscode-remote-containers-9d7dd96d-2e6a-4d03-857e-1aac71eda418.js git-credential-helper $*; }; f"
+[safe]
+	directory = /home/justin/Projects/tutor
