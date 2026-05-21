@@ -36,15 +36,26 @@ done <<<"$pkg_data")
 selected=$(echo "$pkg_list" | fzf "${fzf_args[@]}" --with-nth=1 --delimiter=$'\t')
 
 if [[ -n "$selected" ]]; then
-  pkg_name=$(echo "$selected" | cut -f2)
+  to_install=()
+  to_uninstall=()
 
-  # Check if the selected app is installed
-  if [[ ${installed_map[$pkg_name]} ]]; then
-    echo "Uninstalling $pkg_name..."
-    flatpak uninstall -y "$pkg_name"
-  else
-    echo "Installing $pkg_name..."
-    flatpak install -y flathub "$pkg_name"
+  # Handle each selected line individually so multi-select works.
+  while IFS=$'\t' read -r name app; do
+    [[ -z "$app" ]] && continue
+    if [[ ${installed_map[$app]} ]]; then
+      to_uninstall+=("$app")
+    else
+      to_install+=("$app")
+    fi
+  done <<<"$selected"
+
+  if [[ ${#to_uninstall[@]} -gt 0 ]]; then
+    echo "Uninstalling: ${to_uninstall[*]}"
+    flatpak uninstall -y "${to_uninstall[@]}"
   fi
 
+  if [[ ${#to_install[@]} -gt 0 ]]; then
+    echo "Installing: ${to_install[*]}"
+    flatpak install -y flathub "${to_install[@]}"
+  fi
 fi
