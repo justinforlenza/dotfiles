@@ -4,20 +4,62 @@ set -euo pipefail
 WALLPAPER_DIR="$HOME/.wallpapers"
 TEMP_DIR="$HOME/.local/share/split-wallpapers"
 
+usage() {
+    cat <<EOF
+Usage: ${0##*/} [IMAGE]
+
+Splits a wallpaper across all monitors and applies it via Plasma.
+
+  IMAGE   Optional path to an image file. If omitted, a random image is
+          picked from $WALLPAPER_DIR
+EOF
+}
+
+case "${1-}" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+esac
+
+if [ "$#" -gt 1 ]; then
+    echo "Error: too many arguments" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ "$#" -eq 1 ]; then
+    # Use the image the caller gave us
+    WALLPAPER="$1"
+
+    if [ ! -f "$WALLPAPER" ]; then
+        echo "Error: '$WALLPAPER' is not a file" >&2
+        exit 1
+    fi
+
+    if ! magick identify "$WALLPAPER" > /dev/null 2>&1; then
+        echo "Error: '$WALLPAPER' is not a readable image" >&2
+        exit 1
+    fi
+
+    # Resolve to an absolute path so the file:// URL stays valid
+    WALLPAPER=$(readlink -f "$WALLPAPER")
+else
+    # Randomly select a wallpaper
+    WALLPAPER=$(find "$WALLPAPER_DIR" -type f \
+        \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.bmp" \) | shuf -n 1)
+
+    if [ -z "$WALLPAPER" ]; then
+        echo "No wallpapers found in $WALLPAPER_DIR" >&2
+        exit 1
+    fi
+fi
+
 mkdir -p "$TEMP_DIR"
 rm -f "$TEMP_DIR"/*.png
 
 # Generate a random id for this wallpaper change
 SESSION_ID=$(date +%s%N | sha256sum | head -c 8)
-
-# Randomly select a wallpaper
-WALLPAPER=$(find "$WALLPAPER_DIR" -type f \
-    \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.bmp" \) | shuf -n 1)
-
-if [ -z "$WALLPAPER" ]; then
-    echo "No wallpapers found in $WALLPAPER_DIR" >&2
-    exit 1
-fi
 
 # Get monitor information (strip ANSI colour codes)
 MONITOR_INFO=$(kscreen-doctor -o | sed 's/\x1b\[[0-9;]*m//g')
